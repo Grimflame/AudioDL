@@ -1,0 +1,282 @@
+# PROJECT CONTEXT – Stable Diffusion Prompt Creator (Danbooru-powered)
+
+## Overview
+
+This project is a small web app that helps compose **coherent, one-line Stable Diffusion prompts**.
+It fetches tags from the **Danbooru API**, applies **quality filters**, **context-aware sorting**, **alias/implication normalization**, and **bucket rules** (subject, details, pose, mood/lighting, environment, FX). It includes a **seeded deterministic rotation** so the same selections can produce different—but still consistent—prompts when you change the seed.
+
+The stack:
+
+* **Backend**: Python + FastAPI, SQLite cache (tags/aliases/implications).
+* **Frontend**: React (Vite). Minimal UI: 6 buckets, compact weights, separate negative panel, prompt bar.
+* **Primary goal**: produce a single, comma-separated prompt (no duplicates, logical order, conflicts resolved).
+
+## Key Features
+
+1. **Danbooru integration**
+
+   * `/tags.json` (category=general, ordered by count), cached in SQLite (`tags_cache.db`).
+   * **Tag aliases** and **tag implications** pulled and stored locally, used in generation.
+   * Thin backoff & retry for reliability; optional offline mode returns cached data.
+
+2. **Smart sorting & filtering**
+
+   * Filters out noisy tags via `quality_filters.json` (e.g. `1girl`, `rating:safe`).
+   * Context-aware boosts via `context_rules.json` (e.g. environment “beach” boosts “sunlight”, etc.).
+   * Popularity (post\_count) + context boosts → ranked suggestions per bucket.
+
+3. **Buckets & rules**
+
+   * Buckets: `subject`, `subject_detail`, `pose_frame`, `mood_light_style`, `environment`, `fx_action`.
+   * Caps per bucket (e.g., 1 subject, 4–6 details, etc.).
+   * Mutual exclusions (e.g., `night` vs `day`, `indoor` vs `outdoor`, `short_hair` vs `long_hair`).
+
+4. **Deterministic variation (seed)**
+
+   * `/tags` can rotate visible suggestions with a seed.
+   * `/generate` rotates selections **per bucket** using the seed **before** applying caps/rules.
+
+5. **Prompt assembly**
+
+   * Apply alias canonicalization + expand implications.
+   * Re-bucket post-implications.
+   * Apply conflicts & caps, de-duplicate.
+   * Optional **weights** per tag (formatted as `tag:(weight)`).
+   * Separate **negative prompt** (de-duplicated).
+
+6. **UI (clean pass)**
+
+   * 6 columns by bucket with search.
+   * **NegativePanel**: separate, searchable list of suggested negative tags.
+   * **Weights**: compact “pill + stepper” per selected tag.
+   * PromptBar: Seed field, “Generate & Copy” (positive), “Copy Negative” (negative).
+
+## Directory Structure (backend root)
+
+* `main.py`                 FastAPI app: endpoints `/tags`, `/generate`, `/presets`, `/health`
+* `danbooru.py`             HTTP client for Danbooru (tags, aliases, implications) + retry/backoff
+* `cache.py`                SQLite persistence: tags cache, alias, implications; canonicalize/expand
+* `mapping.py`              Simple heuristics mapping tag → bucket
+* `rules.py`                Bucket caps, mutual exclusions, rules application
+* `smart_sort.py`           Quality filtering + context boost + popularity-based ordering
+* `config.py`               App config (OFFLINE mode, display caps, base URL, user agent)
+* `quality_filters.json`    Banlist + optional whitelist (edit to tune quality)
+* `context_rules.json`      Context → suggested tags for boosting (edit to tune behavior)
+* `presets.json`            (Currently unused by UI; can be retained for future presets feature)
+* `tags_cache.db`           SQLite data (generated at runtime; DO NOT COMMIT)
+* `frontend/`               Vite React app
+
+  * `src/`
+
+    * `api.js`             Minimal fetch helpers
+    * `store.js`           Zustand store (buckets, selections, weights, negative, seed)
+    * `components/`
+
+      * `TagBucket.jsx`    List/search/select tags per bucket
+      * `NegativePanel.jsx`Separate, searchable negative tags
+      * `PromptBar.jsx`    Seed + Generate/Copy buttons, outputs
+    * `App.jsx`            Page layout (6 buckets, weights, negative, prompt bar)
+    * `app.css`            Styles (grid layout, compact controls)
+
+## API Endpoints
+
+* `GET /health` → `{ "ok": true }`
+* `GET /tags?bucket=subject&seed=&context=`
+
+  * `bucket`: one of the six buckets (defaults to `subject`).
+  * `seed`: optional; if provided, rotates the visible tag list deterministically.
+  * `context`: optional CSV of `bucket:tag` to boost related suggestions.
+  * Returns: `{ "tags": ["tag1","tag2", ...] }`
+* `GET /presets` (currently informational; UI presets removed)
+* `POST /generate`
+
+  * Body:
+
+    ```json
+    {
+      "selections": {
+        "subject": ["woman"],
+        "subject_detail": ["blue_eyes","long_hair"],
+        "pose_frame": ["portrait"],
+        "mood_light_style": ["cinematic_lighting"],
+        "environment": ["cityscape","night"],
+        "fx_action": ["bokeh"]
+      },
+      "weights": { "cinematic_lighting": 1.1, "bokeh": 1.05 },
+      "negative": ["blurry","lowres"],
+      "seed": "42"
+    }
+    ```
+  * Response:
+
+    ```json
+    {
+      "prompt": "woman, blue_eyes, long_hair, portrait, cinematic_lighting:(1.1), cityscape, night, bokeh:(1.05)",
+      "negative_prompt": "blurry, lowres"
+    }
+    ```
+
+## Configuration
+
+* `config.py` environment variables:
+
+  * `OFFLINE` (default `"false"`): if true/1, only serve cached tags (no external requests).
+  * `DANBOORU_BASE`: base URL, default `https://danbooru.donmai.us`.
+  * `USER_AGENT`: custom UA for requests, default `sd-prompt-app/1.0`.
+  * `TAGS_LIMIT_PER_BUCKET`: how many to fetch per bucket on refresh (default 50–100).
+  * `DISPLAY_CAP_PER_BUCKET`: how many suggestions to return in `/tags` (default 10).
+
+## Install & Run (developer)
+
+1. Python env
+
+   ```bash
+   python -m venv .venv
+   # Windows
+   .venv\Scripts\activate
+   # macOS/Linux
+   # source .venv/bin/activate
+   pip install -r <(echo "fastapi\nuvicorn\nrequests\npydantic\nnumpy")
+   ```
+
+   (Or install from your project metadata if you maintain `requirements.txt`.)
+
+2. Backend
+
+   ```bash
+   uvicorn main:app --reload
+   ```
+
+   Runs at `http://localhost:8000`
+
+3. Frontend
+
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+
+   Vite dev server at `http://localhost:5173`
+
+## Data Flow (high level)
+
+1. UI requests `/tags?bucket=...` → backend fetches from cache (refresh if stale unless OFFLINE).
+2. Backend applies quality filter + context boosts + cap; returns names (optionally rotated by seed).
+3. User selects tags per bucket, adjusts optional weights, adds negatives.
+4. UI calls `/generate` with selections/weights/negative/seed.
+5. Backend canonicalizes + expands implications, **re-buckets**, rotates per bucket by seed, applies rules/caps, formats prompt and negative prompt.
+6. UI displays final strings and offers copy buttons.
+
+## Customization Points
+
+* **Edit `quality_filters.json`** to refine `banned`/`whitelist`.
+* **Edit `context_rules.json`** to improve contextual boosts.
+* **Tune caps/conflicts** in `rules.py`.
+* **Improve mapping** in `mapping.py` or replace with a data-driven table.
+* **Weights**: keep within a small range (e.g., 0.8–1.2) for subtle emphasis.
+
+## Known Limitations / Next Steps
+
+* Mapping heuristics are simple; building a curated mapping (or learning-based classifier) would improve bucket accuracy.
+* Context boosts are rule-based; co-occurrence mining could automate this.
+* No authentication/rate-limiting on public deployments (only intended for local use).
+* Presets file is unused by UI after cleanup; either reintroduce UI presets later or remove the file.
+
+## What to Commit to GitHub (and what NOT to)
+
+Commit (keep in repo):
+
+* All source files: `main.py`, `danbooru.py`, `cache.py`, `mapping.py`, `rules.py`, `smart_sort.py`, `config.py`
+* JSON configs: `quality_filters.json`, `context_rules.json`, (optionally `presets.json` for future use)
+* Frontend app (`frontend/`), excluding `node_modules/`
+* Helper scripts like `start_dev.bat`
+
+DO NOT commit (delete or .gitignore):
+
+* `.venv/`               (virtual env; heavy, machine-specific)
+* `__pycache__/`         (compiled Python bytecode)
+* `node_modules/`        (frontend dependencies; re-created by npm)
+* `tags_cache.db`        (runtime cache DB)
+* Any old one-off installer/upgrade `.txt` scripts you no longer need
+
+## Suggested `.gitignore`
+
+```
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Node
+frontend/node_modules/
+frontend/.vite/
+frontend/dist/
+
+# Editor/OS
+.DS_Store
+Thumbs.db
+
+# Runtime data
+tags_cache.db
+```
+
+## How to Push to GitHub
+
+1. Initialize (first time in this folder)
+
+   ```bash
+   git init
+   git checkout -b main
+   ```
+
+2. Create `.gitignore` (use the section above).
+
+3. Stage & commit
+
+   ```bash
+   git add .
+   git commit -m "Initial commit: Danbooru-powered SD prompt app (backend+frontend)"
+   ```
+
+4. Create a new GitHub repo (on github.com) and copy its HTTPS URL, then:
+
+   ```bash
+   git remote add origin https://github.com/<your-username>/<repo-name>.git
+   git push -u origin main
+   ```
+
+5. Later updates
+
+   ```bash
+   git add -A
+   git commit -m "Feature: seed rotation per bucket, negative panel, compact weights"
+   git push
+   ```
+
+## Troubleshooting
+
+* **Seed seems ignored** → ensure the frontend passes `seed` to `/tags` and `/generate` and backend includes the rotation step before caps.
+* **No tags appear** → check network/console; Danbooru rate limits may apply; try again or set `OFFLINE=true` to rely on cache.
+* **Prompt duplicates** → verify alias canonicalization + de-dup logic in `main.py` and rules in `rules.py`.
+* **Frontend build errors** → delete `frontend/node_modules/` and run `npm install` again.
+
+## Developer Workflow (with VS Code Live)
+
+This project can be edited in Visual Studio Code using Live Share or any “live” extension to view file changes in real time.
+
+When collaborating or using ChatGPT Codex in this setup:
+
+Prefer incremental edits to existing files instead of rewriting entire files unless explicitly requested.
+
+Save files frequently so changes appear immediately in the shared session.
+
+Clearly specify the file name and the exact section of the file to modify.
+
+Maintain .gitignore to prevent committing build artifacts, virtual environments, caches, and node modules.
+
+This workflow ensures Codex (or any AI assistant) modifies only what’s necessary while preserving context and avoiding merge conflicts.
+
+
