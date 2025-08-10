@@ -1,0 +1,27 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Node (même s’ils seront recréés plus tard)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Runtime / cache
+tags_cache.db
+
+# Config locale
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Fichiers temporaires de scripts/doc
+backend_seed_fix.txt
+frontend_cleanup_structure.txt
+frontend_weights_css_compact.txt
+Sd-Prompt.txt

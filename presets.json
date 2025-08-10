@@ -1,0 +1,29 @@
+{
+  "Portrait Ciné": {
+    "subject": ["woman"],
+    "subject_detail": ["blue_eyes", "long_hair"],
+    "pose_frame": ["portrait", "looking_at_viewer"],
+    "mood_light_style": ["cinematic_lighting", "high_detail"],
+    "environment": [],
+    "fx_action": ["bokeh"],
+    "negative": ["blurry", "lowres", "bad_anatomy"]
+  },
+  "Fantasy épique": {
+    "subject": ["knight", "dragon"],
+    "subject_detail": ["plate_armor", "silver_hair"],
+    "pose_frame": ["full_body"],
+    "mood_light_style": ["dramatic", "rim_light"],
+    "environment": ["mountain", "snow"],
+    "fx_action": ["particles"],
+    "negative": ["lowres", "extra_limbs"]
+  },
+  "Cyberpunk nuit": {
+    "subject": ["android"],
+    "subject_detail": ["short_hair"],
+    "pose_frame": ["upper_body", "three-quarter_view"],
+    "mood_light_style": ["neon", "sharp_focus"],
+    "environment": ["cityscape", "night"],
+    "fx_action": ["light_trails"],
+    "negative": ["blurry", "oversaturated"]
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "environment:beach": ["sunlight", "sea", "sand"],
+  "environment:forest": ["sunrays", "mist"],
+  "environment:cityscape": ["neon", "rain"],
+  "mood_light_style:night": ["rim_light", "volumetric_light"]
+}
