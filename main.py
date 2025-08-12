@@ -7,7 +7,7 @@ from cache import fetch_or_cache, canonicalize, expand_implications
 from mapping import map_tag_to_bucket
 from rules import apply_caps_and_rules
 from smart_sort import smart_sort
-import json, hashlib
+import hashlib
 
 app = FastAPI(title="SD Prompt App - Backend")
 
@@ -33,10 +33,10 @@ def _rot(lst: List[str], seed: Optional[str]) -> List[str]:
     k = h % len(lst)
     return lst[k:] + lst[:k]
 
-@app.get("/presets")
-def presets():
-    with open("presets.json","r",encoding="utf-8") as f:
-        return json.load(f)
+
+@app.get("/health")
+def health():
+    return {"ok": True}
 
 @app.get("/tags")
 def get_tags(
@@ -92,9 +92,11 @@ def generate(req: GenerateReq):
         out.append(f"{t}:({w})" if isinstance(w,(int,float)) and abs(w-1.0)>1e-6 else t)
 
     # 6) Negative
-    neg_seen, neg = [], []
+    neg_seen, neg = set(), []
     for n in (req.negative or []):
         c = canonicalize(n)
-        if c not in neg_seen: neg.append(c); neg_seen.add(c)
+        if c not in neg_seen:
+            neg.append(c)
+            neg_seen.add(c)
 
     return GenerateResp(prompt=", ".join(out), negative_prompt=", ".join(neg))
