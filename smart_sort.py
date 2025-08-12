@@ -15,9 +15,9 @@ def smart_sort(tags: List[Dict], context: list[str] | None = None) -> List[Dict]
         n = t["name"]
         if n in banned: 
             continue
-        if wl and n not in wl and len(wl) > 0:
-            # si une whitelist est fournie et non vide, on peut filtrer ici, sinon on ignore
-            pass
+        if wl and n not in wl:
+            # ignorer les tags qui ne sont pas dans la whitelist lorsqu'elle est définie
+            continue
         filtered.append(dict(t))
     # Boost contextuel simple
     boosts: dict[str,int] = {}

@@ -53,7 +53,7 @@ The stack:
 
 ## Directory Structure (backend root)
 
-* `main.py`                 FastAPI app: endpoints `/tags`, `/generate`, `/presets`, `/health`
+* `main.py`                 FastAPI app: endpoints `/tags`, `/generate`, `/health`
 * `danbooru.py`             HTTP client for Danbooru (tags, aliases, implications) + retry/backoff
 * `cache.py`                SQLite persistence: tags cache, alias, implications; canonicalize/expand
 * `mapping.py`              Simple heuristics mapping tag → bucket
@@ -62,7 +62,6 @@ The stack:
 * `config.py`               App config (OFFLINE mode, display caps, base URL, user agent)
 * `quality_filters.json`    Banlist + optional whitelist (edit to tune quality)
 * `context_rules.json`      Context → suggested tags for boosting (edit to tune behavior)
-* `presets.json`            (Currently unused by UI; can be retained for future presets feature)
 * `tags_cache.db`           SQLite data (generated at runtime; DO NOT COMMIT)
 * `frontend/`               Vite React app
 
@@ -87,7 +86,6 @@ The stack:
   * `seed`: optional; if provided, rotates the visible tag list deterministically.
   * `context`: optional CSV of `bucket:tag` to boost related suggestions.
   * Returns: `{ "tags": ["tag1","tag2", ...] }`
-* `GET /presets` (currently informational; UI presets removed)
 * `POST /generate`
 
   * Body:
@@ -181,14 +179,14 @@ The stack:
 * Mapping heuristics are simple; building a curated mapping (or learning-based classifier) would improve bucket accuracy.
 * Context boosts are rule-based; co-occurrence mining could automate this.
 * No authentication/rate-limiting on public deployments (only intended for local use).
-* Presets file is unused by UI after cleanup; either reintroduce UI presets later or remove the file.
+* Presets feature has been removed; reintroduce UI presets later if desired.
 
 ## What to Commit to GitHub (and what NOT to)
 
 Commit (keep in repo):
 
 * All source files: `main.py`, `danbooru.py`, `cache.py`, `mapping.py`, `rules.py`, `smart_sort.py`, `config.py`
-* JSON configs: `quality_filters.json`, `context_rules.json`, (optionally `presets.json` for future use)
+* JSON configs: `quality_filters.json`, `context_rules.json`
 * Frontend app (`frontend/`), excluding `node_modules/`
 * Helper scripts like `start_dev.bat`
 
